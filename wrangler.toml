@@ -3,11 +3,7 @@ name = "mcstories-worker"
 main = "src/index.js"
 compatibility_date = "2024-07-25"
 
-# Add this build section
-[build]
-command = "npm install"
-
-# Add this compatibility_flags section
+# Add compatibility flags at the top level
 compatibility_flags = ["nodejs_compat"]
 
 # Binding for your D1 Database
