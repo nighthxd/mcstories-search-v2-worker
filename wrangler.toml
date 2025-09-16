@@ -13,7 +13,3 @@ enabled = true
 binding = "STORIES_DB"
 database_name = "mcstories-db"
 database_id = "b6ac304b-eddc-42ba-acb9-dfb8954d2940"
-
-# Optional section for local development
-[dev]
-persist_to = ".wrangler/state"
