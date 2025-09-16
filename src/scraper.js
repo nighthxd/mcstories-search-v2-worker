@@ -1,9 +1,4 @@
-/*
- * When, in disgrace with fortune and men's eyes,
- * I all alone beweep my outcast state,
- * And trouble deaf heaven with my bootless cries,
- * And look upon myself and curse my fate...
- */
+console.log("--- RUNNING SCRAPER V2 ---");
 import puppeteer from '@cloudflare/puppeteer';
 import * as cheerio from 'cheerio';
 import { tags } from '../categories';
