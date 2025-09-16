@@ -2,10 +2,8 @@ import puppeteer from '@cloudflare/puppeteer';
 import * as cheerio from 'cheerio';
 import { tags } from '../categories';
 
-/**
- * This is the main function for the scheduled task.
- */
 export async function scrapeAndProcessCategory(env) {
+    console.log("--- RUNNING SCRAPER V3 ---"); // New version to confirm deployment
     let browser = null;
     try {
         const stateQuery = 'SELECT last_scraped_category_index FROM scrape_state WHERE id = 1';
@@ -22,106 +20,50 @@ export async function scrapeAndProcessCategory(env) {
         const categoryToScrape = categoryKeys[nextIndex];
         const urlToScrape = tags[categoryToScrape];
         
-        console.log(`Starting scheduled scrape for category: [${categoryToScrape.toUpperCase()}]`);
+        console.log(`[V3] Starting scrape for category: [${categoryToScrape.toUpperCase()}]`);
 
         browser = await puppeteer.launch(env.MY_BROWSER);
+        const page = await browser.newPage();
 
-        const storiesOnPage = await scrapeIndexPage(browser, urlToScrape);
-        if (storiesOnPage.length === 0) {
-            console.log(`No valid stories found for category [${categoryToScrape.toUpperCase()}]. Skipping database writes.`);
-        } else {
-            console.log(`Found ${storiesOnPage.length} stories. Fetching synopses...`);
-            const synopsisPromises = storiesOnPage.map(story =>
-                scrapeSynopsisPage(browser, story.link).then(synopsis => {
-                    story.synopsis = synopsis;
-                    return story;
-                })
-            );
-            const storiesWithData = await Promise.all(synopsisPromises);
-
-            console.log(`Saving ${storiesWithData.length} stories to the database...`);
-            const insertStatements = storiesWithData.map(story => {
-                const query = `INSERT INTO stories (title, url, categories, synopsis, last_scraped_at) VALUES (?1, ?2, ?3, ?4, ?5)
-                           ON CONFLICT (url) DO UPDATE SET title = EXCLUDED.title, categories = EXCLUDED.categories, synopsis = EXCLUDED.synopsis, last_scraped_at = EXCLUDED.last_scraped_at`;
-                return env.STORIES_DB.prepare(query).bind(
-                    story.title,
-                    story.link,
-                    story.categories.join(','),
-                    story.synopsis,
-                    new Date().toISOString()
-                );
-            });
-            await env.STORIES_DB.batch(insertStatements);
-        }
-
-        await env.STORIES_DB.prepare('UPDATE scrape_state SET last_scraped_category_index = ?1 WHERE id = 1').bind(nextIndex).run();
-        console.log(`Successfully finished scrape for category: [${categoryToScrape.toUpperCase()}]`);
-        
-    } catch (error) {
-        console.error("Error during scheduled scrape:", error);
-    } finally {
-        if (browser) {
-            await browser.close();
-        }
-    }
-}
-
-
-// --- Helper Functions ---
-
-async function scrapeIndexPage(browser, url) {
-    console.log(`[scrapeIndexPage] Starting to scrape index page: ${url}`); // <-- ADDED LOG
-    let page = null;
-    try {
-        page = await browser.newPage();
-        await page.goto(url, { waitUntil: 'networkidle0' });
+        console.log(`[V3] Navigating to page: ${urlToScrape}`);
+        await page.goto(urlToScrape, { waitUntil: 'networkidle0' });
+        console.log(`[V3] Page navigation successful. Getting content...`);
         const data = await page.content();
+        console.log(`[V3] Got page content. Starting to parse with Cheerio...`);
+        
         const $ = cheerio.load(data);
         const stories = [];
         $('a[href$="/index.html"]').each((i, element) => {
             const title = $(element).text().trim();
             const link = $(element).attr('href');
-            
-            console.info(`[scrapeIndexPage] Found raw link: "${link}"`); // <-- ADDED LOG
-            
             if (title && link) {
                 try {
-                    const fullLink = new URL(link, url).href;
-                    console.log(`[scrapeIndexPage]  - Successfully parsed full link: ${fullLink}`); // <-- ADDED LOG
-
+                    const fullLink = new URL(link, urlToScrape).href;
                     if (!fullLink.includes('/Authors/') && !fullLink.includes('/Tags/')) {
-                        const categoriesTd = $(element).parent('td').next('td');
-                        const categories = categoriesTd.text().trim().split(' ').filter(cat => cat.length > 0);
-                        stories.push({ title, link: fullLink, categories });
+                        stories.push({ title, link: fullLink, categories: [categoryToScrape] });
                     }
                 } catch (e) {
-                    console.error(`[scrapeIndexPage]  - FAILED to parse link. Base URL: ${url}, Invalid href: "${link}"`); // <-- IMPROVED LOG
+                    console.error(`[V3] FAILED to parse link. Base URL: ${urlToScrape}, Invalid href: "${link}"`);
                 }
             }
         });
-        return stories;
-    } finally {
-        if (page) await page.close();
-    }
-}
+        
+        console.log(`[V3] Finished parsing. Found ${stories.length} stories.`);
 
-async function scrapeSynopsisPage(browser, storyUrl) {
-    console.log(`[scrapeSynopsisPage] Starting to scrape synopsis from: ${storyUrl}`); // <-- ADDED LOG
-    let page = null;
-    try {
-        page = await browser.newPage();
-        await page.goto(storyUrl, { waitUntil: 'networkidle0' });
-        const data = await page.content();
-        const $ = cheerio.load(data);
-        const storyContentDiv = $('section.synopsis, div#storytext').first();
-        if (storyContentDiv.length > 0) {
-            let rawSynopsis = storyContentDiv.find('p').first().text().trim() || storyContentDiv.text().trim();
-            let synopsis = rawSynopsis.replace(/\s+/g, ' ').substring(0, 1000);
-            if (rawSynopsis.length > 1000) synopsis += '...';
-            return synopsis;
+        if (stories.length > 0) {
+            // Synopsis scraping and DB saving logic would go here, but let's confirm this part works first.
+            console.log(`[V3] SUCCESS: Would now proceed to save ${stories.length} stories.`);
         }
-        return 'Synopsis not available.';
+        
+        // For now, we update the state regardless to avoid getting stuck
+        await env.STORIES_DB.prepare('UPDATE scrape_state SET last_scraped_category_index = ?1 WHERE id = 1').bind(nextIndex).run();
+        console.log(`[V3] Successfully finished for category: [${categoryToScrape.toUpperCase()}]`);
+        
+    } catch (error) {
+        console.error("[V3] CRITICAL ERROR in main block:", error);
     } finally {
-        if (page) await page.close();
+        if (browser) {
+            await browser.close();
+        }
     }
 }
