@@ -6,6 +6,8 @@ compatibility_date = "2024-07-25"
 # Add compatibility flags at the top level
 compatibility_flags = ["nodejs_compat"]
 
+workers_dev = false
+
 # Binding for your D1 Database
 [[d1_databases]]
 binding = "STORIES_DB"
@@ -19,3 +21,11 @@ binding = "MY_BROWSER"
 # Trigger for the scheduled scraper to run every 5 minutes
 [triggers]
 crons = ["*/5 * * * *"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1 # optional. default = 1.
+
+[observability]
+enabled = true
+head_sampling_rate = 1 # optional. default = 1.
