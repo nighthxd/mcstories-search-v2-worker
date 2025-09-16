@@ -1,5 +1,5 @@
-// src/index.js
 import { scrapeAndProcessCategory } from './scraper';
+import { tags } from '../categories';
 
 export default {
     /**
@@ -33,7 +33,6 @@ export default {
      */
     async scheduled(event, env, ctx) {
         console.log(`Cron job triggered: ${event.cron}`);
-        // waitUntil ensures the task runs to completion, even after the initial response.
         ctx.waitUntil(scrapeAndProcessCategory(env));
     },
 };
@@ -61,7 +60,7 @@ async function handleSaveStories(request, env) {
         });
 
         await env.STORIES_DB.batch(insertStatements);
-        return new Response(JSON.stringify({ success: true, count: stories.length }), { headers: { 'Content-Type': 'application/json' }});
+        return new Response(JSON.stringify({ success: true, count: stories.length }), { headers: { 'Content-Type': 'application/json' } });
     } catch (error) {
         console.error("Error saving stories:", error);
         return new Response('Failed to save stories', { status: 500 });
@@ -75,11 +74,30 @@ async function handleSearch(request, env) {
     const { searchParams } = new URL(request.url);
     const includedTags = (searchParams.get('categories') || '').split(',').filter(Boolean);
     const searchQuery = searchParams.get('query') || '';
+
+    let query = 'SELECT title, url, categories, synopsis FROM stories';
+    const params = [];
+    const whereClauses = [];
+
+    if (searchQuery) {
+        whereClauses.push('title LIKE ?');
+        params.push(`%${searchQuery}%`);
+    }
+
+    // Improved logic to filter by categories
+    if (includedTags.length > 0) {
+        includedTags.forEach(tag => {
+            whereClauses.push('categories LIKE ?');
+            params.push(`%${tag}%`);
+        });
+    }
+
+    if (whereClauses.length > 0) {
+        query += ' WHERE ' + whereClauses.join(' AND ');
+    }
+    query += ' ORDER BY title;';
     
-    // Note: D1 doesn't support array logic or complex text search well.
-    // This performs a simple LIKE search.
-    const query = `SELECT title, url, categories, synopsis FROM stories WHERE title LIKE ? ORDER BY title;`;
-    const statement = env.STORIES_DB.prepare(query).bind(`%${searchQuery}%`);
+    const statement = env.STORIES_DB.prepare(query).bind(...params);
     const { results } = await statement.all();
 
     // Convert the comma-separated categories string back to an array for the front-end.
@@ -88,7 +106,7 @@ async function handleSearch(request, env) {
         categories: story.categories ? story.categories.split(',') : []
     }));
 
-    return new Response(JSON.stringify(stories), { headers: { 'Content-Type': 'application/json' }});
+    return new Response(JSON.stringify(stories), { headers: { 'Content-Type': 'application/json' } });
 }
 
 /**
@@ -105,5 +123,5 @@ async function handleSynopsis(request, env) {
     const query = 'SELECT synopsis FROM stories WHERE url = ?';
     const result = await env.STORIES_DB.prepare(query).bind(storyUrl).first();
 
-    return new Response(JSON.stringify(result || { synopsis: 'Not found.' }), { headers: { 'Content-Type': 'application/json' }});
+    return new Response(JSON.stringify(result || { synopsis: 'Not found.' }), { headers: { 'Content-Type': 'application/json' } });
 }
