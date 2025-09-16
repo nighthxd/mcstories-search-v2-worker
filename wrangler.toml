@@ -3,6 +3,9 @@ name = "mcstories-worker"
 main = "src/index.js"
 compatibility_date = "2024-07-25"
 
+# Add this flag to enable Node.js compatibility
+nodejs_compat = true
+
 # Binding for your D1 Database
 [[d1_databases]]
 binding = "STORIES_DB"
