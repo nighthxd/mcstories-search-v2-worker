@@ -7,9 +7,11 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
-    "@cloudflare/puppeteer": "^0.0.5",
-    "cheerio": "^1.0.0-rc.12"
-  },
+  "@cloudflare/puppeteer": "^0.0.5",
+  "cheerio": "^1.0.0-rc.12",
+  "puppeteer-extra": "^3.3.6",
+  "puppeteer-extra-plugin-stealth": "^2.11.2"
+},
   "devDependencies": {
     "wrangler": "^4.37.1"
   }

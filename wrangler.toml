@@ -1,21 +1,17 @@
 # wrangler.toml
-name = "mcstories-worker-v1"
+name = "mcstories-worker"
 main = "src/index.js"
 compatibility_date = "2024-07-25"
 compatibility_flags = ["nodejs_compat"]
-workers_dev = false
-
-# This section correctly enables logs and tracing for your deployed Worker
-[observability]
-enabled = true
 
 [[d1_databases]]
 binding = "STORIES_DB"
 database_name = "mcstories-db"
 database_id = "b6ac304b-eddc-42ba-acb9-dfb8954d2940"
 
+# Changed the binding name to match the official documentation
 [browser]
-binding = "MY_BROWSER"
+binding = "BROWSER"
 
 [triggers]
 crons = ["*/5 * * * *"]
