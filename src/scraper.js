@@ -2,12 +2,6 @@ import puppeteer from '@cloudflare/puppeteer';
 import * as cheerio from 'cheerio';
 import { tags } from '../categories';
 
-// Apply the stealth plugin to make Puppeteer invisible
-puppeteer.use(StealthPlugin());
-
-/**
- * This is the main function for the scheduled task.
- */
 export async function scrapeAndProcessCategory(env) {
     let browser = null;
     try {
@@ -25,14 +19,14 @@ export async function scrapeAndProcessCategory(env) {
         const categoryToScrape = categoryKeys[nextIndex];
         const urlToScrape = tags[categoryToScrape];
         
-        console.log(`Starting STEALTH scrape for category: [${categoryToScrape.toUpperCase()}]`);
+        console.log(`Starting scheduled scrape for category: [${categoryToScrape.toUpperCase()}]`);
 
-        // Launch the browser with the stealth plugin active
+        // Changed to use the standard env.BROWSER binding
         browser = await puppeteer.launch(env.BROWSER);
 
         const storiesOnPage = await scrapeIndexPage(browser, urlToScrape);
         if (storiesOnPage.length === 0) {
-            console.log(`No valid stories found for category [${categoryToScrape.toUpperCase()}].`);
+            console.log(`No valid stories found for category [${categoryToScrape.toUpperCase()}]. Skipping database writes.`);
         } else {
             console.log(`Found ${storiesOnPage.length} stories. Fetching synopses...`);
             const synopsisPromises = storiesOnPage.map(story =>
@@ -59,10 +53,10 @@ export async function scrapeAndProcessCategory(env) {
         }
 
         await env.STORIES_DB.prepare('UPDATE scrape_state SET last_scraped_category_index = ?1 WHERE id = 1').bind(nextIndex).run();
-        console.log(`Successfully finished STEALTH scrape for category: [${categoryToScrape.toUpperCase()}]`);
+        console.log(`Successfully finished scrape for category: [${categoryToScrape.toUpperCase()}]`);
         
     } catch (error) {
-        console.error("Error during scheduled stealth scrape:", error);
+        console.error("Error during scheduled scrape:", error);
     } finally {
         if (browser) {
             await browser.close();
@@ -70,7 +64,8 @@ export async function scrapeAndProcessCategory(env) {
     }
 }
 
-// --- Helper Functions (scrapeIndexPage and scrapeSynopsisPage) remain the same ---
+
+// --- Helper Functions ---
 
 async function scrapeIndexPage(browser, url) {
     let page = null;
