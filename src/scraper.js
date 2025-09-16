@@ -1,4 +1,4 @@
-// src/scraper.js
+// src/scraper.js - initial version
 import puppeteer from '@cloudflare/puppeteer';
 import { tags } from '../categories';
 
