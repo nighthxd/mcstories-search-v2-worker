@@ -1,4 +1,4 @@
-// src/scraper.js
+// src/scraper.js - with fix
 import puppeteer from '@cloudflare/puppeteer';
 import cheerio from 'cheerio';
 import { tags } from '../categories';
