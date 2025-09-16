@@ -1,5 +1,4 @@
-import puppeteer from 'puppeteer-extra/lib/Puppeteer';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import puppeteer from '@cloudflare/puppeteer';
 import * as cheerio from 'cheerio';
 import { tags } from '../categories';
 

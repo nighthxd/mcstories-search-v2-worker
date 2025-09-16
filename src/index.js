@@ -120,7 +120,7 @@ async function handleSynopsis(request, env) {
         return new Response('Missing URL parameter', { status: 400 });
     }
 
-    const query = 'SELECT synopsis FROM stories WHERE url = ?';
+    const query = 'SELECT synopsis FROM synopses WHERE url = ?';
     const result = await env.STORIES_DB.prepare(query).bind(storyUrl).first();
 
     return new Response(JSON.stringify(result || { synopsis: 'Not found.' }), { headers: { 'Content-Type': 'application/json' } });
