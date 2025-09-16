@@ -1,5 +1,6 @@
-// src/scraper.js - initial version
+// src/scraper.js
 import puppeteer from '@cloudflare/puppeteer';
+import cheerio from 'cheerio';
 import { tags } from '../categories';
 
 /**
@@ -32,7 +33,7 @@ export async function scrapeAndProcessCategory(env) {
         // 3. Scrape the index page to get story links
         const storiesOnPage = await scrapeIndexPage(browser, urlToScrape);
         if (storiesOnPage.length === 0) {
-            console.log(`No stories found for category [${categoryToScrape.toUpperCase()}]. Skipping.`);
+            console.log(`No valid stories found for category [${categoryToScrape.toUpperCase()}]. Skipping database writes.`);
         } else {
              // 4. Scrape all synopses for the found stories
             console.log(`Found ${storiesOnPage.length} stories. Fetching synopses...`);
@@ -60,7 +61,7 @@ export async function scrapeAndProcessCategory(env) {
             await env.STORIES_DB.batch(insertStatements);
         }
 
-        // 6. Update the state for the next run
+        // 6. Update the state for the next run, even if no stories were found
         await env.STORIES_DB.prepare('UPDATE scrape_state SET last_scraped_category_index = ?1 WHERE id = 1').bind(nextIndex).run();
         console.log(`Successfully finished scrape for category: [${categoryToScrape.toUpperCase()}]`);
         
@@ -77,9 +78,54 @@ export async function scrapeAndProcessCategory(env) {
 // --- Helper Functions ---
 
 async function scrapeIndexPage(browser, url) {
-    // ... (This function remains the same as in the warm-cache.js file)
+    let page = null;
+    try {
+        page = await browser.newPage();
+        await page.goto(url, { waitUntil: 'networkidle0' });
+        const data = await page.content();
+        const $ = cheerio.load(data);
+        const stories = [];
+        $('a[href$="/index.html"]').each((i, element) => {
+            const title = $(element).text().trim();
+            const link = $(element).attr('href');
+            if (title && link) {
+                try {
+                    // This is now wrapped in a try...catch block to handle invalid links
+                    const fullLink = new URL(link, url).href; 
+
+                    if (!fullLink.includes('/Authors/') && !fullLink.includes('/Tags/')) {
+                        const categoriesTd = $(element).parent('td').next('td');
+                        const categories = categoriesTd.text().trim().split(' ').filter(cat => cat.length > 0);
+                        stories.push({ title, link: fullLink, categories });
+                    }
+                } catch (e) {
+                    // If a link is invalid, log it and move on to the next one
+                    console.warn(`Skipping invalid link found on ${url}: "${link}"`);
+                }
+            }
+        });
+        return stories;
+    } finally {
+        if (page) await page.close();
+    }
 }
 
 async function scrapeSynopsisPage(browser, storyUrl) {
-    // ... (This function remains the same as in the warm-cache.js file)
+    let page = null;
+    try {
+        page = await browser.newPage();
+        await page.goto(storyUrl, { waitUntil: 'networkidle0' });
+        const data = await page.content();
+        const $ = cheerio.load(data);
+        const storyContentDiv = $('section.synopsis, div#storytext').first();
+        if (storyContentDiv.length > 0) {
+            let rawSynopsis = storyContentDiv.find('p').first().text().trim() || storyContentDiv.text().trim();
+            let synopsis = rawSynopsis.replace(/\s+/g, ' ').substring(0, 1000);
+            if (rawSynopsis.length > 1000) synopsis += '...';
+            return synopsis;
+        }
+        return 'Synopsis not available.';
+    } finally {
+        if (page) await page.close();
+    }
 }
