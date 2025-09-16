@@ -1,4 +1,9 @@
-// src/scraper.js - with fix
+/*
+ * When, in disgrace with fortune and men's eyes,
+ * I all alone beweep my outcast state,
+ * And trouble deaf heaven with my bootless cries,
+ * And look upon myself and curse my fate...
+ */
 import puppeteer from '@cloudflare/puppeteer';
 import * as cheerio from 'cheerio';
 import { tags } from '../categories';
@@ -90,7 +95,7 @@ async function scrapeIndexPage(browser, url) {
             const link = $(element).attr('href');
             if (title && link) {
                 try {
-                    // This is now wrapped in a try...catch block to handle invalid links
+                    // This is the crucial try...catch block to handle invalid links
                     const fullLink = new URL(link, url).href; 
 
                     if (!fullLink.includes('/Authors/') && !fullLink.includes('/Tags/')) {
