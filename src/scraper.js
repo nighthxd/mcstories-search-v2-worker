@@ -1,16 +1,13 @@
-console.log("--- RUNNING SCRAPER V2 ---");
 import puppeteer from '@cloudflare/puppeteer';
 import * as cheerio from 'cheerio';
 import { tags } from '../categories';
 
 /**
  * This is the main function for the scheduled task.
- * It figures out which category to scrape next, scrapes it, and saves the data.
  */
 export async function scrapeAndProcessCategory(env) {
     let browser = null;
     try {
-        // 1. Get the last scraped category index from the database
         const stateQuery = 'SELECT last_scraped_category_index FROM scrape_state WHERE id = 1';
         let stateResult = await env.STORIES_DB.prepare(stateQuery).first();
 
@@ -27,15 +24,12 @@ export async function scrapeAndProcessCategory(env) {
         
         console.log(`Starting scheduled scrape for category: [${categoryToScrape.toUpperCase()}]`);
 
-        // 2. Connect to Cloudflare's remote browser
         browser = await puppeteer.launch(env.MY_BROWSER);
 
-        // 3. Scrape the index page to get story links
         const storiesOnPage = await scrapeIndexPage(browser, urlToScrape);
         if (storiesOnPage.length === 0) {
             console.log(`No valid stories found for category [${categoryToScrape.toUpperCase()}]. Skipping database writes.`);
         } else {
-             // 4. Scrape all synopses for the found stories
             console.log(`Found ${storiesOnPage.length} stories. Fetching synopses...`);
             const synopsisPromises = storiesOnPage.map(story =>
                 scrapeSynopsisPage(browser, story.link).then(synopsis => {
@@ -45,7 +39,6 @@ export async function scrapeAndProcessCategory(env) {
             );
             const storiesWithData = await Promise.all(synopsisPromises);
 
-            // 5. Save the complete data to the database
             console.log(`Saving ${storiesWithData.length} stories to the database...`);
             const insertStatements = storiesWithData.map(story => {
                 const query = `INSERT INTO stories (title, url, categories, synopsis, last_scraped_at) VALUES (?1, ?2, ?3, ?4, ?5)
@@ -61,7 +54,6 @@ export async function scrapeAndProcessCategory(env) {
             await env.STORIES_DB.batch(insertStatements);
         }
 
-        // 6. Update the state for the next run, even if no stories were found
         await env.STORIES_DB.prepare('UPDATE scrape_state SET last_scraped_category_index = ?1 WHERE id = 1').bind(nextIndex).run();
         console.log(`Successfully finished scrape for category: [${categoryToScrape.toUpperCase()}]`);
         
@@ -78,6 +70,7 @@ export async function scrapeAndProcessCategory(env) {
 // --- Helper Functions ---
 
 async function scrapeIndexPage(browser, url) {
+    console.log(`[scrapeIndexPage] Starting to scrape index page: ${url}`); // <-- ADDED LOG
     let page = null;
     try {
         page = await browser.newPage();
@@ -88,10 +81,13 @@ async function scrapeIndexPage(browser, url) {
         $('a[href$="/index.html"]').each((i, element) => {
             const title = $(element).text().trim();
             const link = $(element).attr('href');
+            
+            console.info(`[scrapeIndexPage] Found raw link: "${link}"`); // <-- ADDED LOG
+            
             if (title && link) {
                 try {
-                    // This is the crucial try...catch block to handle invalid links
-                    const fullLink = new URL(link, url).href; 
+                    const fullLink = new URL(link, url).href;
+                    console.log(`[scrapeIndexPage]  - Successfully parsed full link: ${fullLink}`); // <-- ADDED LOG
 
                     if (!fullLink.includes('/Authors/') && !fullLink.includes('/Tags/')) {
                         const categoriesTd = $(element).parent('td').next('td');
@@ -99,8 +95,7 @@ async function scrapeIndexPage(browser, url) {
                         stories.push({ title, link: fullLink, categories });
                     }
                 } catch (e) {
-                    // If a link is invalid, log it and move on to the next one
-                    console.warn(`Skipping invalid link found on ${url}: "${link}"`);
+                    console.error(`[scrapeIndexPage]  - FAILED to parse link. Base URL: ${url}, Invalid href: "${link}"`); // <-- IMPROVED LOG
                 }
             }
         });
@@ -111,6 +106,7 @@ async function scrapeIndexPage(browser, url) {
 }
 
 async function scrapeSynopsisPage(browser, storyUrl) {
+    console.log(`[scrapeSynopsisPage] Starting to scrape synopsis from: ${storyUrl}`); // <-- ADDED LOG
     let page = null;
     try {
         page = await browser.newPage();
