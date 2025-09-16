@@ -19,6 +19,3 @@ binding = "MY_BROWSER"
 
 [triggers]
 crons = ["*/5 * * * *"]
-
-[dev]
-persist_to = ".wrangler/state"
