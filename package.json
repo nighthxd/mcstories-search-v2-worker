@@ -11,6 +11,6 @@
     "cheerio": "^1.0.0-rc.12"
   },
   "devDependencies": {
-    "wrangler": "^3.0.0"
+    "wrangler": "^4.37.1"
   }
 }
