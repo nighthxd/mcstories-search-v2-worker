@@ -1,6 +1,4 @@
-import { scrapeAndProcessCategory } from './scraper';
-import { tags } from '../categories';
-
+// src/index.js
 export default {
     /**
      * This handles all incoming HTTP requests from your Netlify functions.
@@ -8,7 +6,7 @@ export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
 
-        // Security Check: Make sure the request is from a trusted source.
+        // Security Check
         const secretKey = request.headers.get('X-CUSTOM-AUTH-KEY');
         if (secretKey !== env.NETLIFY_TO_CLOUDFLARE_SECRET) {
             return new Response('Unauthorized', { status: 401 });
@@ -26,14 +24,6 @@ export default {
         }
 
         return new Response('Not Found', { status: 404 });
-    },
-
-    /**
-     * This handles the scheduled cron job to scrape data.
-     */
-    async scheduled(event, env, ctx) {
-        console.log(`Cron job triggered: ${event.cron}`);
-        ctx.waitUntil(scrapeAndProcessCategory(env));
     },
 };
 
@@ -84,7 +74,6 @@ async function handleSearch(request, env) {
         params.push(`%${searchQuery}%`);
     }
 
-    // Improved logic to filter by categories
     if (includedTags.length > 0) {
         includedTags.forEach(tag => {
             whereClauses.push('categories LIKE ?');
@@ -100,7 +89,6 @@ async function handleSearch(request, env) {
     const statement = env.STORIES_DB.prepare(query).bind(...params);
     const { results } = await statement.all();
 
-    // Convert the comma-separated categories string back to an array for the front-end.
     const stories = results.map(story => ({
         ...story,
         categories: story.categories ? story.categories.split(',') : []
@@ -120,7 +108,7 @@ async function handleSynopsis(request, env) {
         return new Response('Missing URL parameter', { status: 400 });
     }
 
-    const query = 'SELECT synopsis FROM synopses WHERE url = ?';
+    const query = 'SELECT synopsis FROM stories WHERE url = ?';
     const result = await env.STORIES_DB.prepare(query).bind(storyUrl).first();
 
     return new Response(JSON.stringify(result || { synopsis: 'Not found.' }), { headers: { 'Content-Type': 'application/json' } });
