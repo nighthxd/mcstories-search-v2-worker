@@ -1,0 +1,109 @@
+// src/index.js
+import { scrapeAndProcessCategory } from './scraper';
+
+export default {
+    /**
+     * This handles all incoming HTTP requests from your Netlify functions.
+     */
+    async fetch(request, env, ctx) {
+        const url = new URL(request.url);
+
+        // Security Check: Make sure the request is from a trusted source.
+        const secretKey = request.headers.get('X-CUSTOM-AUTH-KEY');
+        if (secretKey !== env.NETLIFY_TO_CLOUDFLARE_SECRET) {
+            return new Response('Unauthorized', { status: 401 });
+        }
+
+        // --- ROUTER ---
+        if (url.pathname === '/save-stories' && request.method === 'POST') {
+            return handleSaveStories(request, env);
+        }
+        if (url.pathname === '/search' && request.method === 'GET') {
+            return handleSearch(request, env);
+        }
+        if (url.pathname === '/synopsis' && request.method === 'GET') {
+            return handleSynopsis(request, env);
+        }
+
+        return new Response('Not Found', { status: 404 });
+    },
+
+    /**
+     * This handles the scheduled cron job to scrape data.
+     */
+    async scheduled(event, env, ctx) {
+        console.log(`Cron job triggered: ${event.cron}`);
+        // waitUntil ensures the task runs to completion, even after the initial response.
+        ctx.waitUntil(scrapeAndProcessCategory(env));
+    },
+};
+
+/**
+ * Handles saving scraped story data to the D1 database.
+ */
+async function handleSaveStories(request, env) {
+    try {
+        const stories = await request.json();
+        if (!Array.isArray(stories) || stories.length === 0) {
+            return new Response('No story data provided', { status: 400 });
+        }
+
+        const insertStatements = stories.map(story => {
+            const query = `INSERT INTO stories (title, url, categories, synopsis, last_scraped_at) VALUES (?1, ?2, ?3, ?4, ?5)
+                           ON CONFLICT (url) DO UPDATE SET title = EXCLUDED.title, categories = EXCLUDED.categories, synopsis = EXCLUDED.synopsis, last_scraped_at = EXCLUDED.last_scraped_at`;
+            return env.STORIES_DB.prepare(query).bind(
+                story.title,
+                story.link,
+                story.categories.join(','),
+                story.synopsis,
+                new Date().toISOString()
+            );
+        });
+
+        await env.STORIES_DB.batch(insertStatements);
+        return new Response(JSON.stringify({ success: true, count: stories.length }), { headers: { 'Content-Type': 'application/json' }});
+    } catch (error) {
+        console.error("Error saving stories:", error);
+        return new Response('Failed to save stories', { status: 500 });
+    }
+}
+
+/**
+ * Handles user-facing searches by querying the D1 database.
+ */
+async function handleSearch(request, env) {
+    const { searchParams } = new URL(request.url);
+    const includedTags = (searchParams.get('categories') || '').split(',').filter(Boolean);
+    const searchQuery = searchParams.get('query') || '';
+    
+    // Note: D1 doesn't support array logic or complex text search well.
+    // This performs a simple LIKE search.
+    const query = `SELECT title, url, categories, synopsis FROM stories WHERE title LIKE ? ORDER BY title;`;
+    const statement = env.STORIES_DB.prepare(query).bind(`%${searchQuery}%`);
+    const { results } = await statement.all();
+
+    // Convert the comma-separated categories string back to an array for the front-end.
+    const stories = results.map(story => ({
+        ...story,
+        categories: story.categories ? story.categories.split(',') : []
+    }));
+
+    return new Response(JSON.stringify(stories), { headers: { 'Content-Type': 'application/json' }});
+}
+
+/**
+ * Handles fetching a single synopsis from the database.
+ */
+async function handleSynopsis(request, env) {
+    const { searchParams } = new URL(request.url);
+    const storyUrl = searchParams.get('url');
+
+    if (!storyUrl) {
+        return new Response('Missing URL parameter', { status: 400 });
+    }
+
+    const query = 'SELECT synopsis FROM stories WHERE url = ?';
+    const result = await env.STORIES_DB.prepare(query).bind(storyUrl).first();
+
+    return new Response(JSON.stringify(result || { synopsis: 'Not found.' }), { headers: { 'Content-Type': 'application/json' }});
+}

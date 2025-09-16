@@ -1,0 +1,18 @@
+# wrangler.toml
+name = "mcstories-worker"
+main = "src/index.js"
+compatibility_date = "2024-07-25"
+
+# Binding for your D1 Database
+[[d1_databases]]
+binding = "STORIES_DB"
+database_name = "mcstories-db"
+database_id = "b6ac304b-eddc-42ba-acb9-dfb8954d2940"
+
+# Binding for the Browser Rendering API (for Puppeteer)
+[browser]
+binding = "MY_BROWSER"
+
+# Trigger for the scheduled scraper to run every 5 minutes
+[triggers]
+crons = ["*/5 * * * *"]
