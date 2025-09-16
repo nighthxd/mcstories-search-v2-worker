@@ -92,6 +92,9 @@ async function scrapeIndexPage(browser, url) {
                 try {
                     // This is the crucial try...catch block to handle invalid links
                     const fullLink = new URL(link, url).href; 
+                    console.warn(`URL ${url}`);
+                    console.warn(`Link ${link}`);
+                    console.warn(`fullLink ${fullLink}`);
 
                     if (!fullLink.includes('/Authors/') && !fullLink.includes('/Tags/')) {
                         const categoriesTd = $(element).parent('td').next('td');
@@ -101,6 +104,9 @@ async function scrapeIndexPage(browser, url) {
                 } catch (e) {
                     // If a link is invalid, log it and move on to the next one
                     console.warn(`Skipping invalid link found on ${url}: "${link}"`);
+                    console.warn(`URL2 ${url}`);
+                    console.warn(`Link2 ${link}`);
+                    console.warn(`fullLink2 ${fullLink}`);
                 }
             }
         });
