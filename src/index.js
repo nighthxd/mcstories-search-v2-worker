@@ -50,7 +50,7 @@ async function handleSaveStories(request, env) {
 
         await env.STORIES_DB.batch(insertStatements2);
 
-        const insertStatements = stories.map(story => {
+        const insertStatements2 = stories.map(story => {
             const query = `INSERT INTO synopses (url, content, cached_at) VALUES (?2, ?4, ?5)
                            ON CONFLICT (url) DO UPDATE SET content = EXCLUDED.content, cached_at = EXCLUDED.cached_at`;
             return env.STORIES_DB.prepare(query).bind(
