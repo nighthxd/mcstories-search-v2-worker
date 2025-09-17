@@ -44,12 +44,24 @@ async function handleSaveStories(request, env) {
                 story.title,
                 story.link,
                 story.categories.join(','),
-                synopses.content,
                 new Date().toISOString()
             );
         });
 
-        await env.STORIES_DB.batch(insertStatements);
+        await env.STORIES_DB.batch(insertStatements2);
+
+        const insertStatements = stories.map(story => {
+            const query = `INSERT INTO synopses (url, content, cached_at) VALUES (?2, ?4, ?5)
+                           ON CONFLICT (url) DO UPDATE SET content = EXCLUDED.content, cached_at = EXCLUDED.cached_at`;
+            return env.STORIES_DB.prepare(query).bind(
+                story.link,
+                story.synopsis,
+                new Date().toISOString()
+            );
+        });
+
+        await env.STORIES_DB.batch(insertStatements2);
+
         return new Response(JSON.stringify({ success: true, count: stories.length }), { headers: { 'Content-Type': 'application/json' } });
     } catch (error) {
         console.error("Error saving stories:", error);
@@ -65,7 +77,8 @@ async function handleSearch(request, env) {
     const includedTags = (searchParams.get('categories') || '').split(',').filter(Boolean);
     const searchQuery = searchParams.get('query') || '';
 
-    let query = 'SELECT title, url, categories, FROM stories';
+    let query = 'SELECT title, url, categories FROM stories';
+    let query2 = 'SELECT url, content FROM synopses';
     const params = [];
     const whereClauses = [];
 
