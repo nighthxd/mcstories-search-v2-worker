@@ -64,7 +64,7 @@ async function handleSearch(request, env) {
     const includedTags = (searchParams.get('categories') || '').split(',').filter(Boolean);
     const searchQuery = searchParams.get('query') || '';
 
-    let query = 'SELECT title, url, categories FROM stories';
+    let query = 'SELECT title, url, categories, synopsis FROM stories';
     const params = [];
     const whereClauses = [];
 
@@ -107,7 +107,7 @@ async function handleSynopsis(request, env) {
         return new Response('Missing URL parameter', { status: 400 });
     }
 
-    const query = 'SELECT content FROM synopses WHERE url = ?';
+    const query = 'SELECT synopsis FROM stories WHERE url = ?';
     const result = await env.STORIES_DB.prepare(query).bind(storyUrl).first();
 
     return new Response(JSON.stringify(result || { synopsis: 'Not found.' }), { headers: { 'Content-Type': 'application/json' } });
