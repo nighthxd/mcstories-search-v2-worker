@@ -38,29 +38,16 @@ async function handleSaveStories(request, env) {
         }
 
         const insertStatements = stories.map(story => {
-            const query = `INSERT INTO stories (title, url, categories, last_scraped_at) VALUES (?1, ?2, ?3, ?5)
-                           ON CONFLICT (url) DO UPDATE SET title = EXCLUDED.title, categories = EXCLUDED.categories, last_scraped_at = EXCLUDED.last_scraped_at`;
+            const query = `INSERT INTO stories (title, url, categories, last_scraped_at) VALUES (?1, ?2, ?3, ?4, ?5)
+                           ON CONFLICT (url) DO UPDATE SET title = EXCLUDED.title, categories = EXCLUDED.categories, synopsis = EXCLUDED.synopsis, last_scraped_at = EXCLUDED.last_scraped_at`;
             return env.STORIES_DB.prepare(query).bind(
                 story.title,
                 story.link,
                 story.categories.join(','),
-                new Date().toISOString()
-            );
-        });
-
-        await env.STORIES_DB.batch(insertStatements);
-
-        const insertStatements2 = stories.map(story => {
-            const query = `INSERT INTO synopses (url, content, cached_at) VALUES (?2, ?4, ?5)
-                           ON CONFLICT (url) DO UPDATE SET content = EXCLUDED.content, cached_at = EXCLUDED.cached_at`;
-            return env.STORIES_DB.prepare(query).bind(
-                story.link,
                 story.synopsis,
                 new Date().toISOString()
             );
         });
-
-        await env.STORIES_DB.batch(insertStatements2);
 
         return new Response(JSON.stringify({ success: true, count: stories.length }), { headers: { 'Content-Type': 'application/json' } });
     } catch (error) {
@@ -78,7 +65,6 @@ async function handleSearch(request, env) {
     const searchQuery = searchParams.get('query') || '';
 
     let query = 'SELECT title, url, categories FROM stories';
-    let query2 = 'SELECT url, content FROM synopses';
     const params = [];
     const whereClauses = [];
 
