@@ -48,7 +48,7 @@ async function handleSaveStories(request, env) {
             );
         });
 
-        await env.STORIES_DB.batch(insertStatements2);
+        await env.STORIES_DB.batch(insertStatements);
 
         const insertStatements2 = stories.map(story => {
             const query = `INSERT INTO synopses (url, content, cached_at) VALUES (?2, ?4, ?5)
