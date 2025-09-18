@@ -35,9 +35,9 @@ async function handleSaveStories(request, env) {
         let unchangedCount = 0;
 
         // Prepare statements for reuse
-        const checkStmt = env.D1_DB.prepare('SELECT url, synopsis, categories FROM stories WHERE url = ?');
-        const insertStmt = env.D1_DB.prepare('INSERT INTO stories (title, url, synopsis, categories) VALUES (?, ?, ?, ?)');
-        const updateStmt = env.D1_DB.prepare('UPDATE stories SET title = ?, synopsis = ?, categories = ? WHERE url = ?');
+        const checkStmt = env.STORIES_DB.prepare('SELECT url, synopsis, categories FROM stories WHERE url = ?');
+        const insertStmt = env.STORIES_DB.prepare('INSERT INTO stories (title, url, synopsis, categories) VALUES (?, ?, ?, ?)');
+        const updateStmt = env.STORIES_DB.prepare('UPDATE stories SET title = ?, synopsis = ?, categories = ? WHERE url = ?');
         
         const statements = [];
 
