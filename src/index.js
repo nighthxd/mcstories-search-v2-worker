@@ -20,7 +20,7 @@ export default {
     },
 };
 
-// Handles saving stories with "upsert" logic to minimize writes
+// Handles saving stories with "upsert" logic
 async function handleSaveStories(request, env) {
     try {
         const stories = await request.json();
@@ -34,7 +34,6 @@ async function handleSaveStories(request, env) {
         let updatedCount = 0;
         let unchangedCount = 0;
 
-        // Prepare statements for reuse
         const checkStmt = env.STORIES_DB.prepare('SELECT url, synopsis, categories FROM stories WHERE url = ?');
         const insertStmt = env.STORIES_DB.prepare('INSERT INTO stories (title, url, synopsis, categories) VALUES (?, ?, ?, ?)');
         const updateStmt = env.STORIES_DB.prepare('UPDATE stories SET title = ?, synopsis = ?, categories = ? WHERE url = ?');
@@ -45,15 +44,12 @@ async function handleSaveStories(request, env) {
             const { title, link, synopsis, categories } = story;
             const categoriesStr = categories.join(',').toLowerCase();
 
-            // 1. Read the database to see if the story already exists
             const existing = await checkStmt.bind(link).first();
 
             if (existing) {
-                // 2. Story exists: check if an update is needed
                 const existingCategories = existing.categories || '';
                 const existingSynopsis = existing.synopsis || '';
                 
-                // Compare categories and synopsis to see if data has changed
                 if (existingCategories !== categoriesStr || existingSynopsis !== synopsis) {
                     statements.push(updateStmt.bind(title, synopsis, categoriesStr, link));
                     updatedCount++;
@@ -61,15 +57,13 @@ async function handleSaveStories(request, env) {
                     unchangedCount++;
                 }
             } else {
-                // 3. Story does not exist: insert it
                 statements.push(insertStmt.bind(title, link, synopsis, categoriesStr));
                 insertedCount++;
             }
         }
 
-        // Execute all database operations in a single batch transaction
         if (statements.length > 0) {
-            await env.D1_DB.batch(statements);
+            await env.STORIES_DB.batch(statements);
         }
 
         const response = {
@@ -84,8 +78,8 @@ async function handleSaveStories(request, env) {
         });
 
     } catch (error) {
-        console.error('Error in handleSaveStories:', error);
-        return new Response(JSON.stringify({ error: error.message }), {
+        console.error('Error in handleSaveStories:', error.message);
+        return new Response(JSON.stringify({ error: 'Failed to save stories: ' + error.message }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' },
         });
@@ -93,41 +87,37 @@ async function handleSaveStories(request, env) {
 }
 
 
-// Handles searching for stories (no changes needed here)
+// Handles searching for stories
 async function handleSearch(request, env) {
-    const { searchParams } = new URL(request.url);
-    const query = searchParams.get('query') || '';
-    const categories = (searchParams.get('categories') || '').split(',').filter(Boolean);
-    const excludedCategories = (searchParams.get('excludedCategories') || '').split(',').filter(Boolean);
-
-    let whereClauses = [];
-    let bindings = [];
-
-    // Title search
-    if (query) {
-        whereClauses.push("title LIKE ?");
-        bindings.push(`%${query}%`);
-    }
-
-    // Included categories (AND logic)
-    categories.forEach(category => {
-        whereClauses.push("categories LIKE ?");
-        bindings.push(`%${category}%`);
-    });
-
-    // Excluded categories (AND NOT logic)
-    excludedCategories.forEach(category => {
-        whereClauses.push("categories NOT LIKE ?");
-        bindings.push(`%${category}%`);
-    });
-
-    const whereString = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
-    const finalQuery = `SELECT * FROM stories ${whereString} ORDER BY title ASC;`;
-
     try {
-        const { results } = await env.D1_DB.prepare(finalQuery).bind(...bindings).all();
+        const { searchParams } = new URL(request.url);
+        const query = searchParams.get('query') || '';
+        const categories = (searchParams.get('categories') || '').split(',').filter(Boolean);
+        const excludedCategories = (searchParams.get('excludedCategories') || '').split(',').filter(Boolean);
 
-        // Convert categories from string back to array for the frontend
+        let whereClauses = [];
+        let bindings = [];
+
+        if (query) {
+            whereClauses.push("title LIKE ?");
+            bindings.push(`%${query}%`);
+        }
+
+        categories.forEach(category => {
+            whereClauses.push("categories LIKE ?");
+            bindings.push(`%${category}%`);
+        });
+
+        excludedCategories.forEach(category => {
+            whereClauses.push("categories NOT LIKE ?");
+            bindings.push(`%${category}%`);
+        });
+
+        const whereString = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+        const finalQuery = `SELECT * FROM stories ${whereString} ORDER BY title ASC;`;
+
+        const { results } = await env.STORIES_DB.prepare(finalQuery).bind(...bindings).all();
+
         const formattedResults = results.map(story => ({
             ...story,
             categories: story.categories ? story.categories.split(',') : []
@@ -136,9 +126,9 @@ async function handleSearch(request, env) {
         return new Response(JSON.stringify(formattedResults), {
             headers: { 'Content-Type': 'application/json' },
         });
-    } catch (error) {
-        console.error('Error in handleSearch:', error);
-        return new Response(JSON.stringify({ error: error.message }), {
+    } catch (error) { // The underscore has been removed from here.
+        console.error('Error in handleSearch:', error.message);
+        return new Response(JSON.stringify({ error: 'Failed to execute search: ' + error.message }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' },
         });
