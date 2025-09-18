@@ -1,6 +1,4 @@
 // src/index.js
-import { scrapeAndProcessCategory } from './scraper';
-import { tags } from '../categories';
 
 export default {
     /**
@@ -27,14 +25,6 @@ export default {
         }
 
         return new Response('Not Found', { status: 404 });
-    },
-
-    /**
-     * This handles the scheduled cron job to scrape data.
-     */
-    async scheduled(event, env, ctx) {
-        console.log(`Cron job triggered: ${event.cron}`);
-        ctx.waitUntil(scrapeAndProcessCategory(env));
     },
 };
 
